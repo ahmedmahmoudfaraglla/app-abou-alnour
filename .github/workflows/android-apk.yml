@@ -40,7 +40,7 @@ jobs:
       - name: Clean & bootstrap Android
         run: |
           rm -rf android ios macos linux windows web
-          flutter create .
+          flutter create --project-name app_abou_alnour --org com.msncare --platforms android --overwrite .
           flutter pub get
 
       - name: Build Debug APK
