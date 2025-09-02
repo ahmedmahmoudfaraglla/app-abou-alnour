@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/traccar_service.dart';
-import '../models.dart';
+import '../util/i18n.dart';
 
 class DevicesScreen extends StatefulWidget {
   final TraccarService service;
@@ -11,65 +11,87 @@ class DevicesScreen extends StatefulWidget {
 }
 
 class _DevicesScreenState extends State<DevicesScreen> {
-  late Future<List<Device>> _future;
+  late Future<List<dynamic>> _f;
 
   @override
   void initState() {
     super.initState();
-    _future = widget.service.getDevices();
-  }
-
-  Future<void> _send(Device d, bool stop) async {
-    final m = ScaffoldMessenger.of(context);
-    try {
-      await widget.service.sendEngineCommand(d.id, stop: stop);
-      m.showSnackBar(SnackBar(content: Text(stop?'تم إرسال إيقاف المحرك':'تم إرسال تشغيل المحرك')));
-    } catch (e) {
-      m.showSnackBar(SnackBar(content: Text('فشل إرسال الأمر: $e')));
-    }
+    _f = widget.service.getDevices();
   }
 
   @override
   Widget build(BuildContext context) {
+    final t = I18n.of(context);
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: t.dir,
       child: Scaffold(
-        appBar: AppBar(title: const Text('الأجهزة')),
-        body: FutureBuilder<List<Device>>(
-          future: _future,
-          builder: (c,s){
-            if (s.connectionState!=ConnectionState.done) {
+        appBar: AppBar(
+          title: Text(t.s('devices')),
+          actions: [
+            IconButton(
+              tooltip: t.s('toggleLang'),
+              onPressed: () => I18n.toggle(context),
+              icon: const Icon(Icons.translate),
+            )
+          ],
+        ),
+        body: FutureBuilder<List<dynamic>>(
+          future: _f,
+          builder: (c, s) {
+            if (s.connectionState != ConnectionState.done) {
               return const Center(child: CircularProgressIndicator());
             }
             if (s.hasError) {
-              return Center(child: Text('خطأ: ${s.error}'));
+              return Center(child: Text('Error: ${s.error}'));
             }
-            final devices = s.data!;
-            if (devices.isEmpty) return const Center(child: Text('لا توجد أجهزة'));
+            final list = s.data ?? const [];
+            if (list.isEmpty) return Center(child: Text(t.s('noDevices')));
             return ListView.separated(
-              itemCount: devices.length,
-              separatorBuilder: (_, __)=> const Divider(height: 1),
-              itemBuilder: (c,i){
-                final d = devices[i];
-                final online = d.status == 'online';
+              itemCount: list.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (_, i) {
+                final d = list[i] as Map<String, dynamic>;
+                final name = d['name']?.toString() ?? 'Device';
+                final id = d['id'] as int;
                 return ListTile(
-                  title: Text(d.name),
-                  subtitle: Text('${d.uniqueId} • ${online ? 'متصل' : 'غير متصل'}'),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        tooltip: 'إيقاف المحرك',
-                        icon: const Icon(Icons.stop_circle_outlined),
-                        onPressed: ()=> _send(d, true),
-                      ),
-                      IconButton(
-                        tooltip: 'تشغيل المحرك',
-                        icon: const Icon(Icons.play_circle_outline),
-                        onPressed: ()=> _send(d, false),
-                      ),
-                    ],
-                  ),
+                  title: Text(name),
+                  subtitle: Text('ID: $id'),
+                  trailing: Wrap(spacing: 8, children: [
+                    ElevatedButton(
+                      onPressed: () async {
+                        try {
+                          await widget.service.sendCommand(id, 'engineStop');
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(t.s('stopped'))),
+                          );
+                        } catch (e) {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(e.toString())),
+                          );
+                        }
+                      },
+                      child: Text(t.s('stop')),
+                    ),
+                    OutlinedButton(
+                      onPressed: () async {
+                        try {
+                          await widget.service.sendCommand(id, 'engineResume');
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(t.s('resumed'))),
+                          );
+                        } catch (e) {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(e.toString())),
+                          );
+                        }
+                      },
+                      child: Text(t.s('resume')),
+                    ),
+                  ]),
                 );
               },
             );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/traccar_service.dart';
+import '../util/i18n.dart';
 import 'devices_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -11,7 +12,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _form = GlobalKey<FormState>();
   final _server = TextEditingController(text: 'https://msncare.com'); // بدون /api
-  final _login  = TextEditingController(); // رقم الموبايل أو الإيميل
+  final _phone  = TextEditingController(); // دخول برقم الهاتف فقط
   final _pass   = TextEditingController();
   bool _loading = false;
   String? _error;
@@ -22,17 +23,24 @@ class _LoginScreenState extends State<LoginScreen> {
     return v;
   }
 
-  String _toEmail(String input) {
-    final v = input.trim();
-    return v.contains('@') ? v : '$v@msncare.local';
-  }
+  String _phoneToEmail(String phone) => '${phone.trim()}@msncare.local';
 
   @override
   Widget build(BuildContext context) {
+    final t = I18n.of(context);
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: t.dir,
       child: Scaffold(
-        appBar: AppBar(title: const Text('تسجيل الدخول')),
+        appBar: AppBar(
+          title: Text(t.s('login')),
+          actions: [
+            IconButton(
+              tooltip: t.s('toggleLang'),
+              onPressed: () => I18n.toggle(context),
+              icon: const Icon(Icons.translate),
+            ),
+          ],
+        ),
         body: Padding(
           padding: const EdgeInsets.all(16),
           child: Form(
@@ -41,50 +49,22 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 TextFormField(
                   controller: _server,
-                  decoration: const InputDecoration(labelText: 'رابط الخادم (بدون /api)'),
-                  validator: (v)=> (v==null||v.isEmpty)?'مطلوب':null,
+                  decoration: InputDecoration(labelText: t.s('server')),
+                  validator: (v)=> (v==null||v.isEmpty)?t.s('required'):null,
                 ),
                 TextFormField(
-                  controller: _login,
-                  decoration: const InputDecoration(labelText: 'رقم الموبايل أو الإيميل'),
-                  validator: (v)=> (v==null||v.isEmpty)?'مطلوب':null,
-                ),
-                TextFormField(
-                  controller: _pass,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'كلمة المرور'),
-                  validator: (v)=> (v==null||v.isEmpty)?'مطلوب':null,
-                ),
-                const SizedBox(height: 16),
-                if (_error!=null) Text(_error!, style: const TextStyle(color: Colors.red)),
-                const Spacer(),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _loading ? null : () async {
-                      if(!_form.currentState!.validate()) return;
-                      setState(()=>_loading=true); _error=null;
-                      try {
-                        final server = _normalizeServer(_server.text);
-                        final email  = _toEmail(_login.text);
-                        final svc = TraccarService(server);
-                        await svc.login(email, _pass.text);
-                        if(!mounted) return;
-                        Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(builder: (_)=> DevicesScreen(service: svc)));
-                      } catch (e) {
-                        setState(()=>_error = e.toString());
-                      } finally { if(mounted) setState(()=>_loading=false); }
-                    },
-                    child: Text(_loading ? 'جارٍ الدخول...' : 'دخول'),
+                  controller: _phone,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(labelText: t.s('phone')),
+                  validator: (v)=> (v==n
 
-# 1) اتأكد إن المجلد موجود
-mkdir -p lib/screens
-
-# 2) اكتب/حدّث شاشة اللوجين
+############################################
+# lib/screens/login_screen.dart – دخول برقم الهاتف فقط
+############################################
 cat > lib/screens/login_screen.dart <<'DART'
 import 'package:flutter/material.dart';
 import '../services/traccar_service.dart';
+import '../util/i18n.dart';
 import 'devices_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -96,7 +76,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _form = GlobalKey<FormState>();
   final _server = TextEditingController(text: 'https://msncare.com'); // بدون /api
-  final _login  = TextEditingController(); // رقم الموبايل أو الإيميل
+  final _phone  = TextEditingController(); // دخول برقم الهاتف فقط
   final _pass   = TextEditingController();
   bool _loading = false;
   String? _error;
@@ -107,17 +87,24 @@ class _LoginScreenState extends State<LoginScreen> {
     return v;
   }
 
-  String _toEmail(String input) {
-    final v = input.trim();
-    return v.contains('@') ? v : '$v@msncare.local';
-  }
+  String _phoneToEmail(String phone) => '${phone.trim()}@msncare.local';
 
   @override
   Widget build(BuildContext context) {
+    final t = I18n.of(context);
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: t.dir,
       child: Scaffold(
-        appBar: AppBar(title: const Text('تسجيل الدخول')),
+        appBar: AppBar(
+          title: Text(t.s('login')),
+          actions: [
+            IconButton(
+              tooltip: t.s('toggleLang'),
+              onPressed: () => I18n.toggle(context),
+              icon: const Icon(Icons.translate),
+            ),
+          ],
+        ),
         body: Padding(
           padding: const EdgeInsets.all(16),
           child: Form(
@@ -126,19 +113,20 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 TextFormField(
                   controller: _server,
-                  decoration: const InputDecoration(labelText: 'رابط الخادم (بدون /api)'),
-                  validator: (v)=> (v==null||v.isEmpty)?'مطلوب':null,
+                  decoration: InputDecoration(labelText: t.s('server')),
+                  validator: (v)=> (v==null||v.isEmpty)?t.s('required'):null,
                 ),
                 TextFormField(
-                  controller: _login,
-                  decoration: const InputDecoration(labelText: 'رقم الموبايل أو الإيميل'),
-                  validator: (v)=> (v==null||v.isEmpty)?'مطلوب':null,
+                  controller: _phone,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(labelText: t.s('phone')),
+                  validator: (v)=> (v==null||v.isEmpty)?t.s('required'):null,
                 ),
                 TextFormField(
                   controller: _pass,
                   obscureText: true,
-                  decoration: const InputDecoration(labelText: 'كلمة المرور'),
-                  validator: (v)=> (v==null||v.isEmpty)?'مطلوب':null,
+                  decoration: InputDecoration(labelText: t.s('password')),
+                  validator: (v)=> (v==null||v.isEmpty)?t.s('required'):null,
                 ),
                 const SizedBox(height: 16),
                 if (_error!=null) Text(_error!, style: const TextStyle(color: Colors.red)),
@@ -151,7 +139,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       setState(()=>_loading=true); _error=null;
                       try {
                         final server = _normalizeServer(_server.text);
-                        final email  = _toEmail(_login.text);
+                        final email  = _phoneToEmail(_phone.text); // نحول لایمیل داخلي
                         final svc = TraccarService(server);
                         await svc.login(email, _pass.text);
                         if(!mounted) return;
@@ -161,7 +149,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         setState(()=>_error = e.toString());
                       } finally { if(mounted) setState(()=>_loading=false); }
                     },
-                    child: Text(_loading ? 'جارٍ الدخول...' : 'دخول'),
+                    child: Text(_loading ? t.s('loggingIn') : t.s('login')),
                   ),
                 )
               ],
