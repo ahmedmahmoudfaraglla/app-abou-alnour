@@ -1,5 +1,5 @@
-name: msncare_app
-description: Fresh start (v1)
+name: msncare_tracker
+description: MSN Care Tracker (live map + trips + commands)
 publish_to: "none"
 
 environment:
@@ -8,6 +8,14 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: ^0.19.0
+
+  http: ^1.2.2
+  shared_preferences: ^2.2.3
+  flutter_map: ^6.1.0
+  latlong2: ^0.9.1
 
 dev_dependencies:
   flutter_test:
