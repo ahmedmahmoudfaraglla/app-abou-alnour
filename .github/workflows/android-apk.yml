@@ -1,48 +1,13 @@
-name: Android APK (Debug)
-
-on:
-  workflow_dispatch:
-  push:
-    branches: [ main ]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-          flutter-version: '3.22.2'
-
-      - name: Create android skeleton if missing + add INTERNET
-        run: |
-          if [ ! -d android ]; then
-            flutter create .
-          fi
-          MANIFEST=android/app/src/main/AndroidManifest.xml
-          if ! grep -q 'android.permission.INTERNET' "$MANIFEST"; then
-            sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' "$MANIFEST"
-          fi
-
-      - name: Pub get + analyze
-        run: |
-          flutter pub get
-          flutter analyze
-
-      - name: Build debug APK
-        run: flutter build apk --debug
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-debug.apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
+- name: Ensure Android platform + INTERNET
+  run: |
+    flutter --version
+    if [ ! -f pubspec.yaml ]; then
+      echo "pubspec.yaml missing"; exit 1
+    fi
+    if [ ! -d android ]; then
+      flutter create --platforms=android .
+    fi
+    MANIFEST="android/app/src/main/AndroidManifest.xml"
+    if [ -f "$MANIFEST" ] && ! grep -q 'android.permission.INTERNET' "$MANIFEST"; then
+      sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' "$MANIFEST"
+    fi
