@@ -9,39 +9,36 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: "17"
+          distribution: 'temurin'
+          java-version: '17'
 
-      - name: Setup Flutter (3.22.2)
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.22.2"
-          channel: "stable"
-          cache: true
-
-      - name: Print package name
-        run: |
-          grep -n '^name:' pubspec.yaml || true
-
-      - name: Create Android skeleton if missing + add INTERNET
-        run: |
-          if [ ! -d android ]; then
-            flutter create --platforms=android .
-          fi
-          MANIFEST="android/app/src/main/AndroidManifest.xml"
-          if [ -f "$MANIFEST" ] && ! grep -q 'android.permission.INTERNET' "$MANIFEST"; then
-            sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' "$MANIFEST"
-          fi
+          flutter-version: '3.22.2'
+          channel: 'stable'
 
       - name: Pub get + analyze
         run: |
-          flutter pub get -v
-          flutter analyze --no-fatal-warnings --no-fatal-infos || true
+          flutter pub get
+          flutter analyze || true
+
+      - name: Create android skeleton if missing + add INTERNET
+        shell: bash
+        run: |
+          APP_NAME="app_abou_alnour"   # <== بدون شرطات
+          if [ ! -d android ]; then
+            flutter create . --project-name "$APP_NAME" --platforms android -e
+          fi
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          grep -q 'android.permission.INTERNET' "$MANIFEST" || \
+            sed -i 's|<application|<uses-permission android:name="android.permission.INTERNET"/>\n    <application|' "$MANIFEST"
 
       - name: Build flutter apk --debug -v
         run: flutter build apk --debug -v
@@ -49,5 +46,5 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
+          name: app-debug.apk
           path: build/app/outputs/flutter-apk/app-debug.apk
