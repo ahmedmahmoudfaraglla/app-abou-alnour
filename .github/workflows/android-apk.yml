@@ -25,11 +25,10 @@ jobs:
           cache: true
           android-license: true
 
-      - name: Create android platform if missing
+      - name: Create android (force correct name)
         run: |
-          if [ ! -d android ]; then
-            flutter create --platforms=android .
-          fi
+          rm -rf android
+          flutter create --project-name app_abou_alnour --platforms=android .
 
       - run: flutter pub get -v
       - run: flutter build apk --debug -v
