@@ -1,30 +1,375 @@
 name: Android APK (Debug)
 on:
   workflow_dispatch:
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
+
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
 
-      # توليد/إعادة توليد مشروع Flutter (اسم باكدج صالح)
-      - name: Clean & bootstrap Android
+      # نُنشئ سكافولد أندرويد باسم باكدچ صحيح
+      - name: Bootstrap Android
         run: |
           rm -rf android ios web linux windows macos .dart_tool build || true
           flutter create --project-name app_abou_alnour --org com.msncare --platforms android --overwrite .
 
+      # نحقن pubspec + main.dart (الكود الحقيقي)
+      - name: Inject app source
+        run: |
+          cat > pubspec.yaml <<'PSYAML'
+name: app_abou_alnour
+description: MSN Care Tracker
+publish_to: "none"
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.2
+  intl: ^0.19.0
+  flutter_map: ^6.1.0
+  latlong2: ^0.9.1
+  url_launcher: ^6.3.0
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+flutter:
+  uses-material-design: true
+PSYAML
+
+          mkdir -p lib
+          cat > lib/main.dart <<'DART'
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+
+/// === ضبط السيرفر ===
+/// غيّر الـ BASE_URL لو غير msncare.com
+const String BASE_URL = "https://msncare.com";
+
+void main() {
+  runApp(const AppRoot());
+}
+
+class AppRoot extends StatelessWidget {
+  const AppRoot({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'MSN Care',
+      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.deepPurple),
+      home: const LoginPage(),
+    );
+  }
+}
+
+class ApiClient {
+  final String baseUrl;
+  String? _basic; // Basic auth header
+
+  ApiClient(this.baseUrl);
+
+  void setCredentials(String username, String password) {
+    final raw = utf8.encode('$username:$password');
+    _basic = 'Basic ${base64Encode(raw)}';
+  }
+
+  Map<String, String> get _headers => {
+        'Authorization': _basic ?? '',
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      };
+
+  Future<List<dynamic>> getDevices() async {
+    final r = await http.get(Uri.parse('$baseUrl/api/devices'), headers: _headers);
+    if (r.statusCode == 200) return jsonDecode(r.body);
+    throw Exception('devices ${r.statusCode}');
+  }
+
+  Future<List<dynamic>> getPositionsByDevice(int deviceId) async {
+    final u = Uri.parse('$baseUrl/api/positions?deviceId=$deviceId');
+    final r = await http.get(u, headers: _headers);
+    if (r.statusCode == 200) return jsonDecode(r.body);
+    throw Exception('positions ${r.statusCode}');
+  }
+
+  Future<List<dynamic>> getRoute(int deviceId, DateTime from, DateTime to) async {
+    String f = from.toUtc().toIso8601String();
+    String t = to.toUtc().toIso8601String();
+    final u = Uri.parse('$baseUrl/api/reports/route?deviceId=$deviceId&from=$f&to=$t');
+    final r = await http.get(u, headers: _headers);
+    if (r.statusCode == 200) return jsonDecode(r.body);
+    throw Exception('route ${r.statusCode}');
+  }
+
+  Future<void> sendCommand(int deviceId, String type) async {
+    final u = Uri.parse('$baseUrl/api/commands/send');
+    final body = jsonEncode({'deviceId': deviceId, 'type': type});
+    final r = await http.post(u, headers: _headers, body: body);
+    if (r.statusCode != 200) {
+      throw Exception('command $type -> ${r.statusCode}');
+    }
+  }
+}
+
+class LoginPage extends StatefulWidget {
+  const LoginPage({super.key});
+  @override
+  State<LoginPage> createState() => _LoginPageState();
+}
+
+class _LoginPageState extends State<LoginPage> {
+  final phone = TextEditingController();
+  final pass = TextEditingController();
+  bool busy = false;
+  String? err;
+
+  Future<void> _login() async {
+    setState(() { busy = true; err = null; });
+    try {
+      // في Traccar بنستخدم Basic Auth، واليوزر = رقم الموبايل لو عاملينه كـ username
+      final api = ApiClient(BASE_URL);
+      api.setCredentials(phone.text.trim(), pass.text);
+      // اختبار سريع: نجيب الديفايسز
+      await api.getDevices();
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => HomePage(api: api)),
+      );
+    } catch (e) {
+      setState(() { err = 'فشل الدخول: تأكد من الرقم/الباسورد والصلاحيات'; });
+    } finally {
+      setState(() { busy = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('تسجيل الدخول')),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            TextField(
+              controller: phone,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(labelText: 'رقم الموبايل (Username)'),
+            ),
+            TextField(
+              controller: pass,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'كلمة المرور'),
+            ),
+            const SizedBox(height: 16),
+            if (err != null) Text(err!, style: const TextStyle(color: Colors.red)),
+            const SizedBox(height: 8),
+            FilledButton(
+              onPressed: busy ? null : _login,
+              child: busy ? const CircularProgressIndicator() : const Text('دخول'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class HomePage extends StatefulWidget {
+  final ApiClient api;
+  const HomePage({super.key, required this.api});
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  List<dynamic> devices = [];
+  int? selectedId;
+  Timer? timer;
+  LatLng? current;
+  List<LatLng> routePoints = [];
+  bool showRoute = false;
+
+  final mapController = MapController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDevices();
+  }
+
+  @override
+  void dispose() {
+    timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadDevices() async {
+    final list = await widget.api.getDevices();
+    setState(() {
+      devices = list;
+      if (devices.isNotEmpty) {
+        selectedId = devices.first['id'] as int;
+      }
+    });
+    _startLive();
+  }
+
+  void _startLive() {
+    timer?.cancel();
+    if (selectedId == null) return;
+    timer = Timer.periodic(const Duration(seconds: 5), (_) => _refreshPosition());
+    _refreshPosition();
+  }
+
+  Future<void> _refreshPosition() async {
+    if (selectedId == null) return;
+    final posList = await widget.api.getPositionsByDevice(selectedId!);
+    if (posList.isEmpty) return;
+    final p = posList.last;
+    final lat = (p['latitude'] as num).toDouble();
+    final lon = (p['longitude'] as num).toDouble();
+    final latLng = LatLng(lat, lon);
+    setState(() { current = latLng; });
+    try {
+      mapController.move(latLng, 16);
+    } catch (_) {}
+  }
+
+  Future<void> _loadRouteToday() async {
+    if (selectedId == null) return;
+    final now = DateTime.now();
+    final from = DateTime(now.year, now.month, now.day);
+    final list = await widget.api.getRoute(selectedId!, from, now);
+    final pts = <LatLng>[];
+    for (final p in list) {
+      pts.add(LatLng((p['latitude'] as num).toDouble(), (p['longitude'] as num).toDouble()));
+    }
+    setState(() { routePoints = pts; showRoute = true; });
+  }
+
+  Future<void> _sendCmd(String type) async {
+    if (selectedId == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await widget.api.sendCommand(selectedId!, type);
+      messenger.showSnackBar(SnackBar(content: Text('تم إرسال الأمر: $type')));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('فشل الأمر: $type')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final markers = <Marker>[];
+    if (current != null) {
+      markers.add(Marker(
+        point: current!,
+        width: 40, height: 40,
+        child: const Icon(Icons.location_on, size: 40, color: Colors.red),
+      ));
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('MSN Care — خريطة حيّة')),
+      body: Column(
+        children: [
+          // اختيار الجهاز
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: DropdownButton<int>(
+                    isExpanded: true,
+                    value: selectedId,
+                    items: devices.map<DropdownMenuItem<int>>((d) {
+                      return DropdownMenuItem<int>(
+                        value: d['id'] as int,
+                        child: Text('${d['name']} (${d['uniqueId']})'),
+                      );
+                    }).toList(),
+                    onChanged: (v) {
+                      setState(() { selectedId = v; });
+                      _startLive();
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: _loadRouteToday,
+                  child: const Text('مسار اليوم'),
+                ),
+              ],
+            ),
+          ),
+          // الخريطة
+          Expanded(
+            child: FlutterMap(
+              mapController: mapController,
+              options: MapOptions(
+                initialCenter: current ?? const LatLng(30.0444, 31.2357),
+                initialZoom: 6,
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                  subdomains: const ['a', 'b', 'c'],
+                  userAgentPackageName: 'com.msncare.app',
+                ),
+                MarkerLayer(markers: markers),
+                if (showRoute && routePoints.isNotEmpty)
+                  PolylineLayer(polylines: [
+                    Polyline(points: routePoints, strokeWidth: 4),
+                  ]),
+              ],
+            ),
+          ),
+          // أوامر المحرّك
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: FilledButton.tonal(
+                    onPressed: () => _sendCmd('engineStop'),
+                    child: const Text('إيقاف المحرّك'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () => _sendCmd('engineResume'),
+                    child: const Text('استئناف المحرّك'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+DART
+          flutter pub get
       - name: Build Debug APK
         run: flutter build apk --debug
-
-      - name: Upload APK artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
