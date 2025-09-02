@@ -35,20 +35,17 @@ jobs:
           cache: true
           android-license: true
 
-      # نولّد منصة Android جديدة ونضبط إصدارات الـSDK
       - name: Create Android skeleton (fresh)
         run: |
           rm -rf android
           flutter create --project-name app_abou_alnour --platforms=android .
 
-          # ثبّت إصدارات SDK في gradle.properties
           {
             echo "flutter.minSdkVersion=23"
             echo "flutter.targetSdkVersion=34"
             echo "flutter.compileSdkVersion=34"
           } >> android/gradle.properties
 
-          # أضمن صلاحية الإنترنت
           manifest=android/app/src/main/AndroidManifest.xml
           if ! grep -q 'android.permission.INTERNET' "$manifest"; then
             sed -i 's|<application|<uses-permission android:name="android.permission.INTERNET" />\n    <application|' "$manifest"
@@ -73,7 +70,6 @@ jobs:
           --dart-define=TEST_USER="$TEST_USER"
           --dart-define=TEST_PASS="$TEST_PASS"
 
-      # استخدم Gradle مباشرة لاظهار الخطأ الحقيقي
       - name: Build (Gradle, debug, stacktrace)
         run: |
           cd android
