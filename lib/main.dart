@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
-
+import 'screens/login_screen.dart';
 void main() => runApp(const MyApp());
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
+      title: 'MSN Care',
       debugShowCheckedModeBanner: false,
-      home: Scaffold(
-        body: Center(child: Text('Traccar Distributor App')),
-      ),
+      theme: ThemeData(useMaterial3: true, colorSchemeSeed: const Color(0xFFff7f00)),
+      home: const LoginScreen(),
     );
   }
 }
