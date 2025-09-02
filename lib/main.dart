@@ -7,7 +7,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-const String BASE_URL = "https://msncare.com"; // عدّله لو لزم
+const String BASE_URL = "http://5.235.244.34:8082"; // عدّله لو لزم
 
 void main() => runApp(const AppRoot());
 
