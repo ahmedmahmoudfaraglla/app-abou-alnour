@@ -1,7 +1,6 @@
 name: app_abou_alnour
 description: MSN Care Tracker (clean)
 publish_to: "none"
-version: 1.0.0+1
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
@@ -10,9 +9,9 @@ dependencies:
   flutter:
     sdk: flutter
   http: ^1.2.2
+  intl: ^0.19.0
   flutter_map: ^6.1.0
   latlong2: ^0.9.1
-  intl: ^0.19.0
   url_launcher: ^6.3.0
 
 dev_dependencies:
