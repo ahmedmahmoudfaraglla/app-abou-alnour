@@ -1,5 +1,8 @@
-name: msncare_tracker
-description: MSN Care Tracker (live map + trips + commands)
+      - name: Write pubspec.yaml
+        run: |
+          cat <<'EOF' > pubspec.yaml
+name: app_abou_alnour
+description: MSN Care Tracker
 publish_to: "none"
 
 environment:
@@ -8,14 +11,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_localizations:
-    sdk: flutter
-  intl: ^0.19.0
-
   http: ^1.2.2
-  shared_preferences: ^2.2.3
+  intl: ^0.19.0
   flutter_map: ^6.1.0
   latlong2: ^0.9.1
+  url_launcher: ^6.3.0
 
 dev_dependencies:
   flutter_test:
@@ -24,3 +24,10 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+EOF
+      - name: Ensure INTERNET permission
+        run: |
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          if ! grep -q 'android.permission.INTERNET' "$MANIFEST"; then
+            sed -i '0,/<application/{s//<uses-permission android:name="android.permission.INTERNET"\/>\n&/}' "$MANIFEST"
+          fi
