@@ -7,7 +7,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-const String BASE_URL = "https://msncare.com"; // غيّرها لو عندك دومين/بورت مختلف
+const String BASE_URL = "https://msncare.com";
 
 void main() => runApp(const AppRoot());
 
@@ -17,7 +17,11 @@ class AppRoot extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'MSN Care Tracker',
-        theme: ThemeData.dark(useMaterial3: true),
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+          useMaterial3: true,
+          brightness: Brightness.dark,
+        ),
         home: LoginPage(api: Api(BASE_URL)),
       );
 }
@@ -60,10 +64,11 @@ class Api {
   }
 
   Future<List> route(int deviceId, DateTime from, DateTime to) async {
-    final f = Uri.encodeComponent(from.toUtc().toIso8601String());
-    final t = Uri.encodeComponent(to.toUtc().toIso8601String());
-    final uri = Uri.parse('$base/api/reports/route')
-        .replace(queryParameters: {'deviceId': '$deviceId', 'from': f, 'to': t});
+    final f = from.toUtc().toIso8601String();
+    final t = to.toUtc().toIso8601String();
+    final uri = Uri.parse('$base/api/reports/route').replace(
+      queryParameters: {'deviceId': '$deviceId', 'from': f, 'to': t},
+    );
     final r = await http.get(uri, headers: _headers);
     if (r.statusCode == 200) return jsonDecode(r.body) as List;
     throw Exception('route ${r.statusCode}');
@@ -95,7 +100,10 @@ class _LoginPageState extends State<LoginPage> {
   String? err;
 
   Future<void> _go() async {
-    setState(() { busy = true; err = null; });
+    setState(() {
+      busy = true;
+      err = null;
+    });
     try {
       final user = phone.text.trim();
       final username = user.contains('@') ? user : '$user@msncare.local';
@@ -104,10 +112,10 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
       Navigator.of(context)
           .pushReplacement(MaterialPageRoute(builder: (_) => Home(api: widget.api)));
-    } catch (_) {
+    } catch (e) {
       setState(() => err = 'فشل الدخول');
     } finally {
-      setState(() => busy = false);
+      if (mounted) setState(() => busy = false);
     }
   }
 
@@ -121,16 +129,27 @@ class _LoginPageState extends State<LoginPage> {
               child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                 const Text('تسجيل الدخول', style: TextStyle(fontSize: 24)),
                 const SizedBox(height: 12),
-                TextField(controller: phone, decoration: const InputDecoration(labelText: 'رقم الموبايل أو البريد')),
+                TextField(
+                    controller: phone,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration:
+                        const InputDecoration(labelText: 'رقم الموبايل أو البريد')),
                 const SizedBox(height: 8),
-                TextField(controller: pass, decoration: const InputDecoration(labelText: 'كلمة المرور'), obscureText: true),
+                TextField(
+                    controller: pass,
+                    decoration: const InputDecoration(labelText: 'كلمة المرور'),
+                    obscureText: true),
                 const SizedBox(height: 12),
-                if (err != null) Text(err!, style: const TextStyle(color: Colors.red)),
+                if (err != null)
+                  Text(err!, style: const TextStyle(color: Colors.red)),
                 const SizedBox(height: 8),
                 FilledButton(
                   onPressed: busy ? null : _go,
-                  child: busy ? const SizedBox(width:18,height:18,child:CircularProgressIndicator()) : const Text('دخول'),
-                ),
+                  child: busy
+                      ? const SizedBox(
+                          width: 18, height: 18, child: CircularProgressIndicator())
+                      : const Text('دخول'),
+                )
               ]),
             ),
           ),
@@ -161,14 +180,19 @@ class _HomeState extends State<Home> {
     _loadDevices();
     poll = Timer.periodic(const Duration(seconds: 15), (_) => _pull());
   }
+
   @override
-  void dispose() { poll?.cancel(); super.dispose(); }
+  void dispose() {
+    poll?.cancel();
+    super.dispose();
+  }
 
   Future<void> _loadDevices() async {
     setState(() => loading = true);
     try {
       final l = await widget.api.devices();
-      setState(() => devices = l.map((e) => Map<String, dynamic>.from(e as Map)).toList());
+      setState(() =>
+          devices = l.map((e) => Map<String, dynamic>.from(e as Map)).toList());
     } catch (_) {}
     setState(() => loading = false);
   }
@@ -184,6 +208,7 @@ class _HomeState extends State<Home> {
           final lat = (p['latitude'] as num).toDouble();
           final lon = (p['longitude'] as num).toDouble();
           setState(() => cur = LatLng(lat, lon));
+          mapController.move(cur!, 14);
         }
       }
     } catch (_) {}
@@ -209,9 +234,12 @@ class _HomeState extends State<Home> {
         if (showRoute) mapController.move(pts.last, 14);
       });
     } catch (_) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('فشل تحميل المسار')));
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('فشل تحميل المسار')));
+      }
     } finally {
-      setState(() => loading = false);
+      if (mounted) setState(() => loading = false);
     }
   }
 
@@ -220,22 +248,29 @@ class _HomeState extends State<Home> {
     setState(() => loading = true);
     try {
       await widget.api.sendCommand(selectedId!, type);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('أُرسل: $type')));
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('أُرسل: $type')));
+      }
     } catch (_) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('فشل إرسال الأمر')));
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('فشل إرسال الأمر')));
+      }
     } finally {
-      setState(() => loading = false);
+      if (mounted) setState(() => loading = false);
     }
   }
 
   void _openExternalMap(LatLng p) {
-    final url = Uri.encodeFull('https://www.google.com/maps/search/?api=1&query=${p.latitude},${p.longitude}');
-    launchUrl(Uri.parse(url));
+    final url =
+        Uri.encodeFull('https://www.google.com/maps/search/?api=1&query=${p.latitude},${p.longitude}');
+    launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
   }
 
   @override
   Widget build(BuildContext c) {
-    final center = cur ?? LatLng(30.0444, 31.2357);
+    final initial = cur ?? const LatLng(30.0444, 31.2357);
     return Scaffold(
       appBar: AppBar(title: const Text('أجهزتي')),
       body: Column(children: [
@@ -252,23 +287,36 @@ class _HomeState extends State<Home> {
                     final d = devices[i];
                     final online = (d['status'] ?? '') == 'online';
                     return GestureDetector(
-                      onTap: () { setState(() { selectedId = d['id'] as int; }); _pull(); },
+                      onTap: () {
+                        setState(() => selectedId = d['id'] as int);
+                        _pull();
+                      },
                       child: Container(
                         width: 220,
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: selectedId == d['id'] ? Colors.blueGrey.shade700 : Colors.grey.shade900,
-                          borderRadius: BorderRadius.circular(8),
+                          color: selectedId == d['id']
+                              ? Colors.blueGrey.shade700
+                              : Colors.grey.shade900,
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Row(children: [
-                            Icon(Icons.directions_car, color: online ? Colors.green : Colors.grey),
-                            const SizedBox(width: 8),
-                            Expanded(child: Text(d['name'] ?? 'Device', style: const TextStyle(fontSize: 16))),
-                          ]),
-                          const SizedBox(height: 8),
-                          Text('ID: ${d['id']} • ${d['status'] ?? 'unknown'}', style: const TextStyle(fontSize: 12)),
-                        ]),
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(children: [
+                                Icon(Icons.directions_car,
+                                    color: online ? Colors.green : Colors.grey),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                    child: Text(d['name'] ?? 'Device',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(fontSize: 16))),
+                              ]),
+                              const SizedBox(height: 8),
+                              Text('ID: ${d['id']} • ${d['status'] ?? 'unknown'}',
+                                  style: const TextStyle(fontSize: 12)),
+                            ]),
                       ),
                     );
                   },
@@ -277,38 +325,67 @@ class _HomeState extends State<Home> {
         Expanded(
           child: FlutterMap(
             mapController: mapController,
-            options: MapOptions(center: center, zoom: 13),
+            options: MapOptions(
+              initialCenter: initial, // v6 API
+              initialZoom: 13,
+            ),
             children: [
-              const TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'),
+              const TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'),
               if (cur != null)
-                MarkerLayer(markers: [Marker(point: cur!, width: 40, height: 40, builder: (_) => const Icon(Icons.place, size: 40))]),
+                MarkerLayer(markers: [
+                  Marker(
+                      point: cur!,
+                      width: 40,
+                      height: 40,
+                      child: const Icon(Icons.place, size: 40))
+                ]),
               if (showRoute && pts.isNotEmpty)
-                PolylineLayer(polylines: [Polyline(points: pts, color: Colors.orangeAccent, strokeWidth: 4.0)]),
+                PolylineLayer(
+                    polylines: [
+                      Polyline(points: pts, color: Colors.orange, strokeWidth: 4)
+                    ]),
             ],
           ),
         ),
         SafeArea(
           minimum: const EdgeInsets.all(12),
           child: Row(children: [
-            Expanded(child: FilledButton.icon(
-              onPressed: (selectedId != null && !loading) ? () => _sendCmd('engineStop') : null,
-              icon: const Icon(Icons.power_settings_new),
-              label: const Text('إيقاف'))),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed:
+                    (selectedId != null && !loading) ? () => _sendCmd('engineStop') : null,
+                icon: const Icon(Icons.power_settings_new),
+                label: const Text('إيقاف'),
+              ),
+            ),
             const SizedBox(width: 8),
-            Expanded(child: FilledButton.icon(
-              onPressed: (selectedId != null && !loading) ? () => _sendCmd('engineResume') : null,
-              icon: const Icon(Icons.restart_alt),
-              label: const Text('تشغيل'))),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: (selectedId != null && !loading)
+                    ? () => _sendCmd('engineResume')
+                    : null,
+                icon: const Icon(Icons.restart_alt),
+                label: const Text('تشغيل'),
+              ),
+            ),
             const SizedBox(width: 8),
-            Expanded(child: FilledButton.icon(
-              onPressed: (selectedId != null && !loading) ? _getRoute : null,
-              icon: const Icon(Icons.timeline),
-              label: const Text('مسار'))),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed:
+                    (selectedId != null && !loading) ? _getRoute : null,
+                icon: const Icon(Icons.timeline),
+                label: const Text('مسار'),
+              ),
+            ),
           ]),
         ),
       ]),
       floatingActionButton: cur != null
-          ? FloatingActionButton(onPressed: () => _openExternalMap(cur!), child: const Icon(Icons.open_in_new))
+          ? FloatingActionButton(
+              onPressed: () => _openExternalMap(cur!),
+              child: const Icon(Icons.open_in_new),
+            )
           : null,
     );
   }

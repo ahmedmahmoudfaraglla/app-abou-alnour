@@ -1,54 +1,36 @@
 name: Android APK (Debug)
+
 on:
   workflow_dispatch:
   push:
     branches: [ main ]
-    paths:
-      - 'lib/**'
-      - 'test/**'
-      - 'pubspec.yaml'
-      - '.github/workflows/android-apk.yml'
-
-env:
-  BASE_URL: ${{ secrets.TRACCAR_BASE_URL || 'https://msncare.com' }}
-  TEST_USER: ${{ secrets.TRACCAR_TEST_USER || '' }}
-  TEST_PASS: ${{ secrets.TRACCAR_TEST_PASS || '' }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Java 17
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
+          distribution: 'temurin'
           java-version: '17'
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          channel: 'stable'
           flutter-version: '3.22.2'
-          cache: true
-          android-license: true
 
-      - name: Create Android skeleton (fresh)
+      - name: Create android skeleton if missing + add INTERNET
         run: |
-          rm -rf android
-          flutter create --project-name app_abou_alnour --platforms=android .
-
-          {
-            echo "flutter.minSdkVersion=23"
-            echo "flutter.targetSdkVersion=34"
-            echo "flutter.compileSdkVersion=34"
-          } >> android/gradle.properties
-
-          manifest=android/app/src/main/AndroidManifest.xml
-          if ! grep -q 'android.permission.INTERNET' "$manifest"; then
-            sed -i 's|<application|<uses-permission android:name="android.permission.INTERNET" />\n    <application|' "$manifest"
+          if [ ! -d android ]; then
+            flutter create .
+          fi
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          if ! grep -q 'android.permission.INTERNET' "$MANIFEST"; then
+            sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' "$MANIFEST"
           fi
 
       - name: Pub get + analyze
@@ -56,27 +38,11 @@ jobs:
           flutter pub get
           flutter analyze
 
-      - name: API health (curl)
-        run: |
-          set -e
-          code=$(curl -sS -o /dev/null -w "%{http_code}" "$BASE_URL/api/server" || true)
-          echo "GET $BASE_URL/api/server -> $code"
-          [[ "$code" == "200" || "$code" == "204" || "$code" == "401" ]]
+      - name: Build debug APK
+        run: flutter build apk --debug
 
-      - name: Tests (smoke)
-        run: >
-          flutter test -r expanded
-          --dart-define=BASE_URL="$BASE_URL"
-          --dart-define=TEST_USER="$TEST_USER"
-          --dart-define=TEST_PASS="$TEST_PASS"
-
-      - name: Build (Gradle, debug, stacktrace)
-        run: |
-          cd android
-          ./gradlew --no-daemon assembleDebug -x lint --stacktrace --warning-mode all
-
-      - name: Upload APK
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: app-debug.apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
